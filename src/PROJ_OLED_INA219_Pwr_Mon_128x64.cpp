@@ -13,6 +13,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "Dialog_plain_7.h"
+#include <braciola5pt7b.h>
 //#include <Fonts/FreeMono12pt7b.h>
 
 /* INA219 */
@@ -1197,7 +1198,7 @@ void setup() {
   OLED.display();
   delay(1000);                                                                         // keep startup logo for 1 second on screen
 
-  OLED.setFont(&Dialog_plain_7);
+  OLED.setFont(&braciola5pt7b);
   OLED.setTextColor(WHITE , BLACK);
   /************************************************************/
 
