@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 /**************** IMPORTANT ****************/
 // maxPower is independent from maxVoltage and maxCurrent !!! For example, 2V at 2A is 4W, let's say that's the max
 // but 4V at .1A gives a maxVoltage of 4V
