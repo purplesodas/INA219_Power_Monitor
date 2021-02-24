@@ -17,7 +17,7 @@
 //#include <Fonts/FreeMono12pt7b.h>
 
 /* INA219 */
-#include <Adafruit_INA219.h>
+ #include <Adafruit_INA219.h>
 //#include <INA219.h>
 
 // BEN this needs work, power down & EEPROM stuff
@@ -33,9 +33,9 @@
 #define SAVE                  1
 
 /* Pinout Table - STM32F411CE Blackpill V3*/ 
-#define button1          PB3
-#define modeButton_LED   4
-#define powerButton_LED  5
+#define button1          PA12
+#define modeButton_LED   PA15
+#define powerButton_LED  PA11
 #define power_off_detect A0
 #define battery_level    PA7//A1
 #define longHoldDuration 400
@@ -45,7 +45,8 @@
 #define OLED_RESET 6                                                          // assigned to some unused pin - hardware reset not used (and not even available)
 Adafruit_SSD1306 OLED(OLED_RESET);                                             // construct a display object named "OLED"
 
-Adafruit_INA219 ina219;                                                       // construct a power monitor object named "ina219"
+Adafruit_INA219 ina219(0x40);                                                       // construct a power monitor object named "ina219"
+Adafruit_INA219 ina219Batt(0x41);
 
 
 #define ON  '1'
@@ -651,7 +652,7 @@ void humanInterfaceController () {
 
 /*
    Sets:
-        rawBusVoltage      : mV
+        rawBusVoltage      : V convert to mV
         rawCurrent         : mA
 
         filteredBusVoltage : mV
@@ -663,7 +664,7 @@ void aquireData() {
   if (!DUT_mode) {
                  /*** Raw Values are Aquired from INA219 ***/
                 // rawBusVoltage = ina219.getBusVoltage_raw();
-                 rawBusVoltage    = ina219.getBusVoltage_V();
+                 rawBusVoltage    = ina219.getBusVoltage_V() * 1000 ;
                
                 // rawCurrent    = ina219.getCurrent_raw();
                  rawCurrent   = ina219.getCurrent_mA();
@@ -684,7 +685,7 @@ void aquireData() {
     
                  /*** Adjust Raw Values to Null Out their Error :: Voltage ALWAYS reads LOW :: Current ALWAYS reads HIGH ***/
                  if (rawBusVoltage/1000 <= 25)                                                                       // Make sure we read within bounds
-                     rawBusVoltage = rawBusVoltage + pgm_read_byte_near(voltage_cal_data + rawBusVoltage/1000);
+                     rawBusVoltage = rawBusVoltage + pgm_read_byte_near(voltage_cal_data + rawBusVoltage / 1000);
                 
                  if (rawCurrent/100     <= 30)                                                                       // Make sure we read within bounds
                      rawCurrent    = rawCurrent    - pgm_read_byte_near(current_cal_data + rawCurrent/100    );      
@@ -923,9 +924,11 @@ void displayController(uint8_t mode) {
                                         }break;
 
                 case BATT :             {
-                                        noInterrupts();                                             // spurreous values here - try with no interrupts
-                                        int16_t battReading = analogRead(battery_level);
-                                        interrupts();
+                                        //noInterrupts();                                              // spurreous values here - try with no interrupts
+                                        //int16_t battReading = analogRead(battery_level);
+                                        int16_t battReading = ina219Batt.getBusVoltage_V();
+                                        battReading = battReading * 1000;
+                                        //interrupts();
 
                                         // Draw battery shape
                                         // drawRoundRect(int16_t x0, int16_t y0, int16_t w, int16_t h, int16_t radius, uint16_t color)
@@ -935,7 +938,7 @@ void displayController(uint8_t mode) {
                                         // Convert analog reading into mV
                                         Serial.println("Battery!");
                                         Serial.println(battReading);
-                                        battReading = map(battReading , 0,850 , 0,4200);
+                                        // battReading = map(battReading , 0,850 , 0,4200);
                                         Serial.println(battReading);
                                         // Only recalculate bars once change is more than 100 mV to avoid jitter
                                         if ( abs(battReading - battLevel) > 100 )  {
@@ -1161,7 +1164,7 @@ void Update_IT_callback(uint32_t* data)
 void setup() {
 
   Serial.begin(9600UL);
-  Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
+ Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
 
   pinMode(modeButton_LED , OUTPUT);
   pinMode(powerButton_LED, OUTPUT);
@@ -1173,6 +1176,7 @@ void setup() {
   /****************** Attach Interrupt Pins *******************/
   pinMode(button1, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(button1), registerButtonPress, FALLING);       // will call funtion 'registerButtonPress' when there is a falling edge on pin2
+  
   /************************************************************/
 
   /***************** Attach Timer1 Interrupt ******************/
@@ -1185,11 +1189,11 @@ void setup() {
 
   /***************** Attach Timer2 Interrupt ******************/
 /////////////////////////  ben  uncomment this for power loss detection
-  //TIM_TypeDef *Instance2 = TIM2;
-  //HardwareTimer *MyTim2 = new HardwareTimer(Instance2); 
-  //MyTim2->setOverflow(100, HERTZ_FORMAT); // 10 Hz
-  //MyTim2->attachInterrupt( powerLoss_detector); // mAh_mWh_computer will be called every 1 second
-  //MyTim2->resume();
+  // TIM_TypeDef *Instance2 = TIM2;
+  // HardwareTimer *MyTim2 = new HardwareTimer(Instance2); 
+  // MyTim2->setOverflow(100, HERTZ_FORMAT); // 10 Hz
+  // MyTim2->attachInterrupt( powerLoss_detector); // mAh_mWh_computer will be called every 1 second
+  // MyTim2->resume();
   /************************************************************/
 
 
@@ -1206,6 +1210,7 @@ void setup() {
 //  ina219.begin(0x40);        
 // initialise INA219 module; its default address is Ox40
   ina219.begin();  
+  ina219Batt.begin();
   /************************************************************/
 
   /****************** Show Battery for .5 s *******************/
@@ -1231,7 +1236,7 @@ void setup() {
 
 
 void loop() {
-
+Serial.println("fuck.........................");
   if (buttonWasPressed) humanInterfaceController();                                                                                      // check if button was pressed or if mode was changed
 
   if ( abs((int)millis() - t1) >= 100)  {                                                                             // since t1 is recorded before performing time-consuming actions, this will happen every 100ms
