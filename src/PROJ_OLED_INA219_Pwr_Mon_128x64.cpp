@@ -45,8 +45,8 @@
 #define OLED_RESET 6                                                          // assigned to some unused pin - hardware reset not used (and not even available)
 Adafruit_SSD1306 OLED(OLED_RESET);                                             // construct a display object named "OLED"
 
-Adafruit_INA219 ina219(0x40);                                                       // construct a power monitor object named "ina219"
-Adafruit_INA219 ina219Batt(0x41);
+Adafruit_INA219 ina219(0x41);                                                       // construct a power monitor object named "ina219"
+Adafruit_INA219 ina219Batt(0x40);
 
 
 #define ON  '1'
@@ -926,8 +926,8 @@ void displayController(uint8_t mode) {
                 case BATT :             {
                                         //noInterrupts();                                              // spurreous values here - try with no interrupts
                                         //int16_t battReading = analogRead(battery_level);
-                                        int16_t battReading = ina219Batt.getBusVoltage_V();
-                                        battReading = battReading * 1000;
+                                        int16_t battReading = ina219Batt.getBusVoltage_raw();
+                                        //battReading = battReading * 1000;
                                         //interrupts();
 
                                         // Draw battery shape
@@ -1001,7 +1001,7 @@ void displayController(uint8_t mode) {
                                         // Print mV value below battery for added effect
                                         OLED.setTextSize(1);
                                         OLED.setCursor(41 , 58);
-                                        OLED << battReading/1000 << F(" ") << battReading/100%10 << battReading/10%10 << battReading%10 << F(" mV");
+                                        OLED << battReading/1000 << F(",") << battReading/100%10 << battReading/10%10 << battReading%10 << F(" mV");
                                         
                                         }break;
                 case SER :              {
