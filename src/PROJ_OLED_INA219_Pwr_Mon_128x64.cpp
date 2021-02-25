@@ -34,7 +34,7 @@
 
 /* Pinout Table - STM32F411CE Blackpill V3*/ 
 #define button1          PA12
-#define modeButton_LED   PA15
+#define modeButton_LED   PA10
 #define powerButton_LED  PA11
 #define power_off_detect A0
 #define battery_level    PA7//A1
