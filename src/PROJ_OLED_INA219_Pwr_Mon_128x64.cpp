@@ -14,7 +14,6 @@
 #include <Adafruit_SSD1306.h>
 #include "Dialog_plain_7.h"
 #include <braciola5pt7b.h>
-//#include <Fonts/FreeMono12pt7b.h>
 
 /* INA219 */
  #include <Adafruit_INA219.h>
@@ -66,7 +65,7 @@ Adafruit_INA219 ina219Batt(0x40);
 #define V_A_W_MAX    3
 #define SER          4
 #define BATT         5
-//#define OFF          6   
+#define OFF          6   
 
 // BEN Button timing stuff needs work, 
 volatile uint8_t buttonWasPressed   = 0;
@@ -1157,13 +1156,15 @@ uint32_t MyData = 1; // Parameter used for callback is arbitrarily a pointer to 
 // Every second, print on serial MyData. And increment it.
 void Update_IT_callback(uint32_t* data)
 {
-  Serial.println(*data);
+  Serial2.println(*data);
   *data = *data + 1;
 }
 
 void setup() {
 
   Serial.begin(9600UL);
+  Serial1.begin(9600UL);
+  
  Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
 
   pinMode(modeButton_LED , OUTPUT);
@@ -1236,7 +1237,11 @@ void setup() {
 
 
 void loop() {
+
 Serial.println("fuck.........................");
+Serial1.println("fuck1.........................");
+
+
   if (buttonWasPressed) humanInterfaceController();                                                                                      // check if button was pressed or if mode was changed
 
   if ( abs((int)millis() - t1) >= 100)  {                                                                             // since t1 is recorded before performing time-consuming actions, this will happen every 100ms
