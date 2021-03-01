@@ -1,11 +1,5 @@
 #include <Arduino.h>
 
-/**************** IMPORTANT ****************/
-// maxPower is independent from maxVoltage and maxCurrent !!! For example, 2V at 2A is 4W, let's say that's the max
-// but 4V at .1A gives a maxVoltage of 4V
-// and .1V at 4A gives a maxCurrent of 4A
-// but maxPower still is 4W, not the now displayed 4A*4W
-
 #include <Wire.h>
 #include <Streaming.h>
 
@@ -44,8 +38,8 @@
 #define OLED_RESET 6                                                          // assigned to some unused pin - hardware reset not used (and not even available)
 Adafruit_SSD1306 OLED(OLED_RESET);                                             // construct a display object named "OLED"
 
-Adafruit_INA219 ina219(0x41);                                                       // construct a power monitor object named "ina219"
-Adafruit_INA219 ina219Batt(0x40);
+Adafruit_INA219 ina219(0x40);                                                       // construct a power monitor object named "ina219"
+Adafruit_INA219 ina219Batt(0x41);
 
 
 #define ON  '1'
@@ -539,91 +533,106 @@ void humanInterfaceController () {
   
   uint16_t buttonPressDuration = 0;
 
-
   /* Handle Button Press if Present */
-  if (buttonWasPressed) {
-                        while ( digitalRead(button1) == LOW ) {                                                                                                 // this function is called only after the button pressed flag has been set; we check if button STILL pressed
-                                                              buttonPressDuration++;
-                                                              delay(1);
-                      
-                                                              if (buttonPressDuration > longHoldDuration)  {
-                                                                                                           switch(currentDisplayMode) {
-                                                                                                                                      /* Enter Device Under Test Mode and seed random Values for V, A and W */
-                                                                                                                                      case A           : {}                         // with no break; this will go on to execute the next case (which is what we want)
-                                                                                                                                      case V_A_W       : {
-                                                                                                                                                         OLED.clearDisplay();
-                                                                                                                                                         OLED.setTextSize(2);
-                                                                                                                                                         OLED.setCursor(0,36);
-                                                                                                                                                         if (!DUT_mode) {
-                                                                                                                                                                        OLED << F("DUT_mode=1;");
-                                                                                                                                                                        DUT_mode = 1;
-                                                                                                                                                                        }
-                                                                                                                                                         else           {
-                                                                                                                                                                        OLED << F("DUT_mode=0;");
-                                                                                                                                                                        DUT_mode = 0;
-                                                                                                                                                                        }
-                                                                                                                                                         OLED.display();
+  if (buttonWasPressed)
+  {
+    while (digitalRead(button1) == LOW)
+    { // this function is called only after the button pressed flag has been set; we check if button STILL pressed
+      buttonPressDuration++;
+      delay(1);
 
-                                                                                                                                                         
-                                                                                                                                                         }break;
+      if (buttonPressDuration > longHoldDuration)
+      {
+        switch (currentDisplayMode)
+        {
+        /* Enter Device Under Test Mode and seed random Values for V, A and W */
+        case A:
+        {
+        } // with no break; this will go on to execute the next case (which is what we want)
+        case V_A_W:
+        {
+          OLED.clearDisplay();
+          OLED.setTextSize(2);
+          OLED.setCursor(0, 36);
+          if (!DUT_mode)
+          {
+            OLED << F("DUT_mode=1;");
+            DUT_mode = 1;
+          }
+          else
+          {
+            OLED << F("DUT_mode=0;");
+            DUT_mode = 0;
+          }
+          OLED.display();
+        }
+        break;
 
-                                                                                                                                      /* Reset Accumulator Variables for mAh and mWh */
-                                                                                                                                      case SER         : {}                         // with no break; this will go on to execute the next case (which is what we want)
-                                                                                                                                      case V_A_W_Ah_Wh : {
-                                                                                                                                                         OLED.clearDisplay();
-                                                                                                                                                         OLED.setTextSize(2);
-                                                                                                                                                         OLED.setCursor(20,20);
-                                                                                                                                                         OLED << F("mAh = 0;");
-                                                                                                                                                         OLED.setCursor(20,51);
-                                                                                                                                                         OLED << F("mWh = 0;");
-                                                                                                                                                         OLED.display();
-                                                                                                                                                         
-                                                                                                                                                         mAh = 0;
-                                                                                                                                                         mAs = 0;
-                                                                    
-                                                                                                                                                         mWh = 0;
-                                                                                                                                                         mWs = 0;                      
-                                                                                                                                                         }break;
+        /* Reset Accumulator Variables for mAh and mWh */
+        case SER:
+        {
+        } // with no break; this will go on to execute the next case (which is what we want)
+        case V_A_W_Ah_Wh:
+        {
+          OLED.clearDisplay();
+          OLED.setTextSize(2);
+          OLED.setCursor(20, 20);
+          OLED << F("mAh = 0;");
+          OLED.setCursor(20, 51);
+          OLED << F("mWh = 0;");
+          OLED.display();
 
-                                                                                                                                      /* Reset Maximum Variables for V A and W */
-                                                                                                                                      case V_A_W_MAX   : {
-                                                                                                                                                         OLED.clearDisplay();
-                                                                                                                                                         OLED.setTextSize(1);
-                                                                                                                                                         OLED.setCursor(20,17);
-                                                                                                                                                         OLED << F("maxVoltage = 0;");
-                                                                                                                                                         OLED.setCursor(20,51);
-                                                                                                                                                         OLED << F("maxCurrent = 0;");
-                                                                                                                                                         OLED.display();
-                                                                                                                                                         
-                                                                                                                                                         maxBusVoltage = 0;
-                                                                                                                                                         maxCurrent    = 0;
-                                                                                                                                                         maxPower      = 0;
-                                                                                                                                                         }break;
-                                                                                                                                      case BATT        : {
-                                                                                                                                                         OLED.clearDisplay();
-                                                                                                                                                         OLED.setTextSize(2);
-                                                                                                                                                         OLED.setCursor(24,20);
-                                                                                                                                                         OLED << F("up time");
-                                                                                                                                                         
-                                                                                                                                                         format_and_print_large_number(millis()/1000/60+1, 6, 51);
+          mAh = 0;
+          mAs = 0;
 
-                                                                                                                                                         OLED << F("min");
+          mWh = 0;
+          mWs = 0;
+        }
+        break;
 
-                                                                                                                                                         OLED.display();
-                                                                                                                                                         }break;
-                                                                                                                                      }
-                                                                                                           delay(500);                                          // have the text stay on the screen for at least half a second
-                                                                                                           while ( digitalRead(button1) == LOW ) ;              // have the text stay on the screen for as long as the button is pressed
-                                                                                                           }
-                                                              }
-                        buttonWasPressed = 0;                                                                                                                   // this used to be above while, wrongly: 
-                                                                                                                                                                // the interrupt for button presses would fire during our long presses and set the flag to 1 again
-                                                                                                                                                                // can't sit inside the while, because we may never go in it, and still need the flag cleared
+        /* Reset Maximum Variables for V A and W */
+        case V_A_W_MAX:
+        {
+          OLED.clearDisplay();
+          OLED.setTextSize(1);
+          OLED.setCursor(20, 17);
+          OLED << F("maxVoltage = 0;");
+          OLED.setCursor(20, 51);
+          OLED << F("maxCurrent = 0;");
+          OLED.display();
 
-                        if (buttonPressDuration > longHoldDuration) return;                                                                                     // no more mode changes after long press
-                        }
+          maxBusVoltage = 0;
+          maxCurrent = 0;
+          maxPower = 0;
+        }
+        break;
+        case BATT:
+        {
+          OLED.clearDisplay();
+          OLED.setTextSize(1);
+          OLED.setCursor(20, 20);
+          OLED << F("up time / use");
 
+          format_and_print_large_number(millis() / 1000 / 60 + 1, 6, 35);
+          OLED << F("min");
+          format_and_print_large_number(ina219Batt.getCurrent_mA(), 6,51  );
+          OLED << F("mA");
+          OLED.display();
+        }
+        break;
+        }
+        delay(500); // have the text stay on the screen for at least half a second
+        while (digitalRead(button1) == LOW)
+          ; // have the text stay on the screen for as long as the button is pressed
+      }
+    }
+    buttonWasPressed = 0; // this used to be above while, wrongly:
+                          // the interrupt for button presses would fire during our long presses and set the flag to 1 again
+                          // can't sit inside the while, because we may never go in it, and still need the flag cleared
 
+    if (buttonPressDuration > longHoldDuration)
+      return; // no more mode changes after long press
+  }
 
   /* Handle Mode Change if Applicable */
   if (currentDisplayMode == num_of_last_mode+1) currentDisplayMode = 0;
@@ -672,7 +681,7 @@ void aquireData() {
                  if ( abs(rawCurrent) <= 1 ) rawCurrent = 0;
                  /******************************************/
 
-    
+     
                  /*** Separate Sign for Current Measurement ***/
                  if ( rawCurrent <= 0 ) {                                // Actual Negative Values will be Regarded as Positive, Positive values will be regarded as Negative (makes more sense when doing 3 wire measurements)
                                         rawCurrent = -rawCurrent;
@@ -789,6 +798,7 @@ void setBrightness(uint8_t brightness)
   OLED.dim(false);
   // OLED.SSD1306_command(SH1106_SETCONTRAST);
   // OLED.SSD1306_command(brightness);
+ 
 }
 
 /*
