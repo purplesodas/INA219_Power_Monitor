@@ -26,11 +26,10 @@
 #define SAVE                  1
 
 /* Pinout Table - STM32F411CE Blackpill V3*/ 
-#define button1          PA12
-#define modeButton_LED   PA10
-#define powerButton_LED  PA11
+#define button1          PB14
+#define modeButton_LED   PB13
+#define powerButton_LED  PB12
 #define power_off_detect A0
-#define battery_level    PA7//A1
 #define longHoldDuration 400
 #define dim_disp_after   1200000                                              // dim display after 1 200 000 ms = 20 min
 
@@ -1181,7 +1180,6 @@ void setup() {
   pinMode(powerButton_LED, OUTPUT);
 
   pinMode(power_off_detect, INPUT);
-  pinMode(battery_level   , INPUT);
 
 
   /****************** Attach Interrupt Pins *******************/
