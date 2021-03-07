@@ -2,7 +2,9 @@
 
 #include <Wire.h>
 #include <Streaming.h>
-
+// SD card
+#include <SPI.h>
+#include <SD.h>
 /* OLED */
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -29,9 +31,14 @@
 #define button1          PB14
 #define modeButton_LED   PB13
 #define powerButton_LED  PB12
-#define power_off_detect A0
+// #define power_off_detect A0
 #define longHoldDuration 400
-#define dim_disp_after   1200000                                              // dim display after 1 200 000 ms = 20 min
+#define dim_disp_after   1200000                                         // dim display after 1 200 000 ms = 20 min
+#define mosi
+#define miso
+#define clk
+#define cs
+
 
 
 #define OLED_RESET 6                                                          // assigned to some unused pin - hardware reset not used (and not even available)
@@ -1136,27 +1143,27 @@ void EEPROM_controller(uint8_t action) {
 /*
  * I N T E R R U P T    S E R V I C E    R O U T I N E
  * 
- * Called every 10 ms to analyse wether power still present
+ * Called every 10 ms to analyse wether power still present  --- not used for now, may add back if writing to SD card or something
  */
-void powerLoss_detector() {
-  Serial.println("loss...");
-  if ( analogRead(power_off_detect) > 950 ) {
-                                            // Turn off all the lights - conserve as much power for saving to EEPROM as possible
-                                            turn(powerButton_LED , OFF);
-                                            turn(modeButton_LED  , OFF);
+// void powerLoss_detector() {
+//   Serial.println("loss...");
+//   if ( analogRead(power_off_detect) > 950 ) {
+//                                             // Turn off all the lights - conserve as much power for saving to EEPROM as possible
+//                                             turn(powerButton_LED , OFF);
+//                                             turn(modeButton_LED  , OFF);
 
-                                            // Save to EEPROM
-                                            EEPROM_controller(SAVE);
+//                                             // Save to EEPROM
+//                                             EEPROM_controller(SAVE);
 
-                                            // Turn off display; not worth doing before actually saving, since this takes A LOT of time. Just makes sure the display goes out in an orderly fashion with no garbage on it.
-                                            // Also, turning on interrupts inside an ISR I'm quite sure is very illegal, please no one tell my mom
-                                            interrupts();
-                                            OLED.clearDisplay();
-                                            OLED.display();
+//                                             // Turn off display; not worth doing before actually saving, since this takes A LOT of time. Just makes sure the display goes out in an orderly fashion with no garbage on it.
+//                                             // Also, turning on interrupts inside an ISR I'm quite sure is very illegal, please no one tell my mom
+//                                             interrupts();
+//                                             OLED.clearDisplay();
+//                                             OLED.display();
                                             
-                                            }
+//                                             }
                                             
-}
+// }
 
 /*********Serial Print *********/
 
@@ -1179,7 +1186,7 @@ void setup() {
   pinMode(modeButton_LED , OUTPUT);
   pinMode(powerButton_LED, OUTPUT);
 
-  pinMode(power_off_detect, INPUT);
+  // pinMode(power_off_detect, INPUT);
 
 
   /****************** Attach Interrupt Pins *******************/
@@ -1245,10 +1252,6 @@ void setup() {
 
 
 void loop() {
-
-Serial.println("fuck.........................");
-Serial1.println("fuck1.........................");
-
 
   if (buttonWasPressed) humanInterfaceController();                                                                                      // check if button was pressed or if mode was changed
 
