@@ -801,9 +801,11 @@ void turn(uint8_t LED, char desiredState) {
 */
 void setBrightness(uint8_t brightness)
 {
-  OLED.dim(false);
-  // OLED.SSD1306_command(SH1106_SETCONTRAST);
-  // OLED.SSD1306_command(brightness);
+  // OLED.dim(false);
+  //     OLED.ssd1306_command(SSD1306_SETCONTRAST);                   // 0x81
+  //   ssd1306_command(0x8F);
+  OLED.ssd1306_command(SSD1306_SETCONTRAST);
+  OLED.ssd1306_command(brightness);
  
 }
 
