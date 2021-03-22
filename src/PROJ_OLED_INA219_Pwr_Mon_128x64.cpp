@@ -577,6 +577,7 @@ void humanInterfaceController () {
         /* Reset Accumulator Variables for mAh and mWh */
         case SER:
         {
+          
         } // with no break; this will go on to execute the next case (which is what we want)
         case V_A_W_Ah_Wh:
         {
@@ -1217,7 +1218,7 @@ void setup() {
 
 
  Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
-
+ Serial1 << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
   pinMode(modeButton_LED , OUTPUT);
   pinMode(powerButton_LED, OUTPUT);
 
