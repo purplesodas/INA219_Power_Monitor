@@ -1,10 +1,7 @@
 #include <Arduino.h>
-
+//#include <SoftwareSerial.h>
 #include <Wire.h>
 #include <Streaming.h>
-// SD card
-#include <SPI.h>
-#include <SD.h>
 /* OLED */
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -28,16 +25,19 @@
 #define SAVE                  1
 
 /* Pinout Table - STM32F411CE Blackpill V3*/ 
-#define button1          PB14
+#define button1          PB15
 #define modeButton_LED   PB13
 #define powerButton_LED  PB12
 // #define power_off_detect A0
 #define longHoldDuration 400
 #define dim_disp_after   1200000                                         // dim display after 1 200 000 ms = 20 min
-#define mosi
-#define miso
-#define clk
-#define cs
+
+// BLE HC-05 Software Serial
+#define bleTX PA9
+#define bleRX  PA10
+
+//SoftwareSerial mySerial(bleTX, bleRX); 
+//HardwareSerial Serial1(bleTX, bleRX);
 
 
 
@@ -65,7 +65,7 @@ Adafruit_INA219 ina219Batt(0x41);
 #define V_A_W_MAX    3
 #define SER          4
 #define BATT         5
-#define OFF          6   
+#define ScreenOFF    6   
 
 // BEN Button timing stuff needs work, 
 volatile uint8_t buttonWasPressed   = 0;
@@ -1070,9 +1070,10 @@ void displayController(uint8_t mode) {
                                         
                                         }break;
 
-                case OFF :              {
-                                       // turn(modeButton_LED  , OFF);
-                                      //  OLED.display();
+                case ScreenOFF :              {
+                                        turn(modeButton_LED  , OFF);
+                                        //OLED.display();
+                                        OLED.clearDisplay();
                                         
                                         return;                     // we want the Mode Button LED off, ALWAYS, so we prevent auto-dimmer function below from firing
                                         }break;
@@ -1169,20 +1170,52 @@ void EEPROM_controller(uint8_t action) {
 
 /*********Serial Print *********/
 
-uint32_t MyData = 1; // Parameter used for callback is arbitrarily a pointer to uint32_t, it could be of other type.
+// uint32_t MyData = 1; // Parameter used for callback is arbitrarily a pointer to uint32_t, it could be of other type.
 
-// Every second, print on serial MyData. And increment it.
-void Update_IT_callback(uint32_t* data)
-{
-  Serial2.println(*data);
-  *data = *data + 1;
+// // Every second, print on serial MyData. And increment it.
+// void Update_IT_callback(uint32_t* data)
+// {
+//   Serial2.println(*data);
+//   *data = *data + 1;
+// }
+void sendCommand(const char * command) {
+  Serial.print("Command send :");
+  Serial.println(command);
+  Serial1.println(command);
+  //wait some time
+  delay(100);
+
+  char reply[100];
+  int i = 0;
+  while (Serial1.available()) {
+    reply[i] = Serial1.read();
+    i += 1;
+  }
+  //end the string
+  reply[i] = '\0';
+  Serial.print(reply);
+  Serial.println("Reply end");                 
+  delay(50);
 }
 
 void setup() {
 
-  Serial.begin(9600UL);
+  //Serial.begin(9600UL);
   Serial1.begin(9600UL);
-  
+//Serial1.begin(9600);
+
+  sendCommand("AT");
+  sendCommand("AT+ROLE0");
+  sendCommand("AT+UUID0xFFE0");
+  sendCommand("AT+CHAR0xFFE1");
+  sendCommand("AT+NAMEPower Monitor");
+
+
+
+
+
+
+
  Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
 
   pinMode(modeButton_LED , OUTPUT);
@@ -1254,6 +1287,8 @@ void setup() {
 
 
 void loop() {
+
+  Serial1.println("Slab.........");
 
   if (buttonWasPressed) humanInterfaceController();                                                                                      // check if button was pressed or if mode was changed
 
