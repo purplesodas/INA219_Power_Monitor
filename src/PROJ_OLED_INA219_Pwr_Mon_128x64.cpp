@@ -40,9 +40,11 @@
 //HardwareSerial Serial1(bleTX, bleRX);
 
 
-
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET 6                                                          // assigned to some unused pin - hardware reset not used (and not even available)
-Adafruit_SSD1306 OLED(OLED_RESET);                                             // construct a display object named "OLED"
+//Adafruit_SSD1306 OLED(OLED_RESET);                                             // construct a display object named "OLED"
+Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 Adafruit_INA219 ina219(0x40);                                                       // construct a power monitor object named "ina219"
 Adafruit_INA219 ina219Batt(0x41);
@@ -679,7 +681,7 @@ void aquireData() {
   if (!DUT_mode) {
                  /*** Raw Values are Aquired from INA219 ***/
                 // rawBusVoltage = ina219.getBusVoltage_raw();
-                 rawBusVoltage    = ina219.getBusVoltage_V() * 1000 ;
+                 rawBusVoltage    = ina219.getBusVoltage_V();
                
                 // rawCurrent    = ina219.getCurrent_raw();
                  rawCurrent   = ina219.getCurrent_mA();
@@ -762,7 +764,6 @@ void aquireData() {
 */
 void mAh_mWh_computer() {
 
-Serial.println("Cuss!!!!");
   mAs += abs(filteredCurrent);
   
   if (filteredPower%1000 < 500) mWs += abs(filteredPower/1000    );
@@ -774,7 +775,7 @@ Serial.println("Cuss!!!!");
                    
                    mAs = mAs % 3600;                       // recirculate remainder from division with 3600
                  //mAs = mAs - mAs / 3600;                    !!!!!!!!!!!!! DOES NOT WORK !!!!!!!!!!!!!
-                 Serial.println(mAs);
+                 //Serial.println(mAs);
                    }
 
    
@@ -783,7 +784,7 @@ Serial.println("Cuss!!!!");
                    
                    mWs = mWs % 3600;                       // recirculate remainder from division with 3600
                  //mAs = mAs - mAs / 3600;                    !!!!!!!!!!!!! DOES NOT WORK !!!!!!!!!!!!!
-                 Serial.println(mWs);
+                 //Serial.println(mWs);
                    }
 
 }
@@ -944,7 +945,7 @@ void displayController(uint8_t mode) {
                 case BATT :             {
                                         //noInterrupts();                                              // spurreous values here - try with no interrupts
                                         //int16_t battReading = analogRead(battery_level);
-                                        int16_t battReading = ina219Batt.getBusVoltage_raw();
+                                        int16_t battReading = ina219Batt.getBusVoltage_V() * 1000;
                                         //battReading = battReading * 1000;
                                         //interrupts();
 
@@ -954,10 +955,10 @@ void displayController(uint8_t mode) {
                                         OLED.fillRect     (103,20 , 3 ,10     , WHITE);
 
                                         // Convert analog reading into mV
-                                        Serial.println("Battery!");
-                                        Serial.println(battReading);
+                                        // Serial.println("Battery!");
+                                        // Serial.println(battReading);
                                         // battReading = map(battReading , 0,850 , 0,4200);
-                                        Serial.println(battReading);
+                                       
                                         // Only recalculate bars once change is more than 100 mV to avoid jitter
                                         if ( abs(battReading - battLevel) > 100 )  {
                                                                                   if             (battReading > 3750) battState = 3;                                  //          [3750 , 4200]       =       3 bars
@@ -1209,7 +1210,7 @@ void setup() {
   sendCommand("AT+ROLE0");
   sendCommand("AT+UUID0xFFE0");
   sendCommand("AT+CHAR0xFFE1");
-  sendCommand("AT+NAMEPower Monitor");
+  sendCommand("AT+NAMEPower-Monitor");
 
 
 
@@ -1289,9 +1290,7 @@ void setup() {
 
 void loop() {
 
-  Serial1.println("Slab.........");
-
-  if (buttonWasPressed) humanInterfaceController();                                                                                      // check if button was pressed or if mode was changed
+  if (buttonWasPressed) humanInterfaceController();                                                                   // check if button was pressed or if mode was changed
 
   if ( abs((int)millis() - t1) >= 100)  {                                                                             // since t1 is recorded before performing time-consuming actions, this will happen every 100ms
                                    t1 = millis();
