@@ -1,4 +1,4 @@
-# INA219_Power_Monitor:
+# INA219 Power Monitor:
 
 based on https://github.com/lipton5001/INA219_Power_Monitor (https://www.youtube.com/watch?v=AIoXwwDlH3g&list=PLwP7qH-peVYDnbWy8LLsBfmnyk7JchIrj&ab_channel=darieee)
 
