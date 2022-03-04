@@ -5,3 +5,4 @@
 .vscode/ipch
 .ds_store
 node_modules
+.sconsign.dblite

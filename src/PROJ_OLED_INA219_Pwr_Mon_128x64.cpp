@@ -1,5 +1,4 @@
 #include <Arduino.h>
-//#include <SoftwareSerial.h>
 #include <Wire.h>
 #include <Streaming.h>
 /* OLED */
@@ -69,7 +68,6 @@ Adafruit_INA219 ina219Batt(0x41);
 #define BATT         5
 #define ScreenOFF    6   
 
-// BEN Button timing stuff needs work, 
 volatile uint8_t buttonWasPressed   = 0;
 //uint32_t         timeOfLastInterrupt;             // used for push button interrupt debouncing
 //uint32_t         t1 = 0;                          // used for display refresh clocking
@@ -100,6 +98,7 @@ uint8_t battState = 5;
 
 
 int16_t rawBusVoltage      = 0;                                                                       // int16_t getBusVoltage_raw()          : ±        32 767            mV
+int16_t rawBusBattVoltage      = 0;  
 int16_t rawCurrent         = 0;                                                                       // int16_t getCurrent_raw()             : ±        32 767     1/10 * mA
 
 // data saved for [0.0 , 3.1] A n .1A increments   ::   for example - offset for 1.4A is cal[14] =      15, meaning when we should be reading exactly  1.400A, we read  2.415A instead
@@ -107,17 +106,19 @@ int16_t rawCurrent         = 0;                                                 
 const PROGMEM uint8_t current_cal_data[]  = { 0,  1,  2,  2,  4,  4,  5,  7,  7,  8,  9,  11,  12,  14,  15,  17,  19,  21,  24,  26,  29,  31,  35,  39,  43,  43,  51,  53,  59,  63,  71 };
 // data saved for [0.0 , 25.0] V in 1V increments   ::   for example - offset for 14V is cal[14]  =  50,    meaning when we should be reading exactly 14.000V, we read 13.950V instead
 // we ALWAYS read BELOW !!!
-const PROGMEM uint8_t voltage_cal_data[]  = { 0, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 50, 50, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60                                         };
+const PROGMEM uint8_t voltage_cal_data[]  = { 0, 0, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 50, 50, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60                                         };
 
 int16_t maxBusVoltage      = 0;
 int16_t maxCurrent         = 0;
 int32_t maxPower           = 0;
 
 int16_t filteredBusVoltage     = 0;
+int16_t filteredBusBattVoltage = 0;
 int16_t filteredCurrent        = 0;
 int32_t filteredPower          = 0;                                                                   // int32_t = filteredCurrent * filteredBusVoltage : ±     2 147 483 647        uW
 
 int16_t voltageAccumulator = 0;
+int16_t voltageBattAccumulator = 0;
 int16_t currentAccumulator = 0;
 
 volatile uint32_t mWs = 0; 
@@ -680,11 +681,12 @@ void aquireData() {
 
   if (!DUT_mode) {
                  /*** Raw Values are Aquired from INA219 ***/
-                // rawBusVoltage = ina219.getBusVoltage_raw();
-                 rawBusVoltage    = ina219.getBusVoltage_V();
+                 rawBusVoltage = ina219.getBusVoltage_raw();
+                 rawBusBattVoltage = ina219Batt.getBusVoltage_raw();
+                 //rawBusVoltage    = ina219.getBusVoltage_V();
                
-                // rawCurrent    = ina219.getCurrent_raw();
-                 rawCurrent   = ina219.getCurrent_mA();
+                rawCurrent    = ina219.getCurrent_raw();
+                 //rawCurrent   = ina219.getCurrent_mA();
                  if (rawCurrent % 10 >= 5)   rawCurrent = rawCurrent / 10 + 1;                        // 1237 -> 124
                  else                        rawCurrent = rawCurrent / 10    ;                        // 1234 -? 123
                  if ( abs(rawCurrent) <= 1 ) rawCurrent = 0;
@@ -701,8 +703,8 @@ void aquireData() {
 
     
                  /*** Adjust Raw Values to Null Out their Error :: Voltage ALWAYS reads LOW :: Current ALWAYS reads HIGH ***/
-                 if (rawBusVoltage/1000 <= 25)                                                                       // Make sure we read within bounds
-                     rawBusVoltage = rawBusVoltage + pgm_read_byte_near(voltage_cal_data + rawBusVoltage / 1000);
+                 if (rawBusVoltage/1 <= 25)                // was 1000                                                       // Make sure we read within bounds
+                     rawBusVoltage = rawBusVoltage + pgm_read_byte_near(voltage_cal_data + rawBusVoltage / 1); // was 1000
                 
                  if (rawCurrent/100     <= 30)                                                                       // Make sure we read within bounds
                      rawCurrent    = rawCurrent    - pgm_read_byte_near(current_cal_data + rawCurrent/100    );      
@@ -712,6 +714,8 @@ void aquireData() {
                  /*** Filter Display Values to reduce jitter ***/
                  valueFilterR (&rawBusVoltage, &filteredBusVoltage, &voltageAccumulator, 10, 10);                    // we pass this function the addresses of the input parameters, since they are to be operated on directly
                  valueFilterR (&rawCurrent   , &filteredCurrent   , &currentAccumulator, 10, 10);
+                 valueFilterR (&rawBusBattVoltage, &filteredBusBattVoltage, &voltageBattAccumulator, 100, 100);     
+                 //BING
                  /**********************************************/
                  }
                  
@@ -729,6 +733,7 @@ void aquireData() {
 
                  /*** No real filtering needed in this case ***/   
                  filteredBusVoltage = rawBusVoltage;
+                 filteredBusBattVoltage = rawBusBattVoltage;
                  filteredCurrent    = rawCurrent;
                  /*********************************************/
                  }
@@ -943,10 +948,17 @@ void displayController(uint8_t mode) {
                                         }break;
 
                 case BATT :             {
+                                        // If we are just starting up, aquire data to get batt voltage
+                                        
+                                        if(t1 < 3000){
+
+                                          aquireData();
+                                        }
+                                        
                                         //noInterrupts();                                              // spurreous values here - try with no interrupts
                                         //int16_t battReading = analogRead(battery_level);
-                                        int16_t battReading = ina219Batt.getBusVoltage_V() * 1000;
-                                        //battReading = battReading * 1000;
+                                        //int16_t battReading = ina219Batt.getBusVoltage_V() * 1000;
+                                        int16_t battReading = filteredBusBattVoltage;
                                         //interrupts();
 
                                         // Draw battery shape
@@ -1020,8 +1032,10 @@ void displayController(uint8_t mode) {
                                         // Print mV value below battery for added effect
                                         OLED.setTextSize(1);
                                         OLED.setCursor(41 , 58);
-                                        OLED << battReading/1000 << F(",") << battReading/100%10 << battReading/10%10 << battReading%10 << F(" mV");
-                                        
+                                        OLED << divideBy1000(filteredBusBattVoltage , 0               , 6, voltage) << " V";
+                                        //OLED << battReading/1000 << F(",") << battReading/100%10 << battReading/10%10 << battReading%10 << F(" mV");
+                                        //OLED << filteredBusBattVoltage/1000 << F(",") << filteredBusBattVoltage/100%10 << filteredBusBattVoltage/10%10 << filteredBusBattVoltage%10 << F(" mV");
+                                        //OLED << filteredBusBattVoltage << "V";
                                         }break;
                 case SER :              {
                                         if ( abs((int)millis() - t2) > 1000 ) {                                                                                    // only print every 1 second
@@ -1030,6 +1044,7 @@ void displayController(uint8_t mode) {
                                                                          Serial << divideBy1000000(filteredPower      , 0               , 6)          << F(" , ");
                                                                          Serial << mAh                                                    << F(" , ");
                                                                          Serial << mWh;
+                                                                         Serial << rawBusVoltage;
                                                                          Serial << F("\n");
 
                                                                          t2 = millis();
@@ -1202,7 +1217,7 @@ void sendCommand(const char * command) {
 
 void setup() {
 
-  //Serial.begin(9600UL);
+  Serial.begin(9600UL);
   Serial1.begin(9600UL);
 //Serial1.begin(9600);
 
@@ -1266,12 +1281,6 @@ void setup() {
   ina219Batt.begin();
   /************************************************************/
 
-  /****************** Show Battery for .5 s *******************/
-  turn(powerButton_LED , ON);
-  displayController(BATT);
-  delay(500);
-  /************************************************************/
-
   /******************** EEPROM Controller *********************/
   //EEPROM.begin(EEPROM_LAYOUT_VERSION, AMOUNT_OF_INDEXES);                             // initialise library
   
@@ -1281,6 +1290,11 @@ void setup() {
   turn(modeButton_LED  , ON);
 
   t1 = millis();
+    /****************** Show Battery for .5 s *******************/
+  turn(powerButton_LED , ON);
+  displayController(BATT);
+  delay(500);
+  /************************************************************/
   system_still_initialising = 0;
 }
 
