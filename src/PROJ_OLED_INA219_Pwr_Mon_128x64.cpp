@@ -1,53 +1,57 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include <Streaming.h>
+#include <Arduino.h>    //  Arduino Ref Required by PlatformIO
+#include <Wire.h> //  I2C Library https://www.arduino.cc/en/reference/wire
+#include <Streaming.h>  // C++ Style Output << https://github.com/janelia-arduino/Streaming
 /* OLED */
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include "Dialog_plain_7.h"
-#include <braciola5pt7b.h>
+#include <Adafruit_GFX.h> //  Graphics Library https://github.com/adafruit/Adafruit-GFX-Library
+#include <Adafruit_SSD1306.h> //  OLED driver Library https://github.com/adafruit/Adafruit_SSD1306
+#include <braciola5pt7b.h>  // Mono Space Font 
 
 /* INA219 */
- #include <Adafruit_INA219.h>
-//#include <INA219.h>
+ #include <Adafruit_INA219.h> //  INA219 driver https://github.com/adafruit/Adafruit_INA219
 
 // BEN this needs work, power down & EEPROM stuff
 /* Cross Power-Down State Saving */    
 //#include <EEPROMWearLevel.h> 
-#include <EEPROM.h>
+//#include <EEPROM.h>
+//#include <FlashStorage_STM32.h>   //  Flash Storage / EEPROM Emulation Library (STM32F411 has no internal EEPROM) https://github.com/khoih-prog/FlashStorage_STM32
+#include <extEEPROM.h>  //  External EEPROM Library https://github.com/PaoloP74/extEEPROM
+
+extEEPROM myEEPROM(kbits_256, 1, 64, 0x50); // Initialize External EEPROM extEEPROM myEEPROM(eeprom_size_t devCap, byte nDev, unsigned int pgSize, byte busAddr);
+
+
+
 #define EEPROM_LAYOUT_VERSION 0                                               // every time amount of indexes changes, ie we change the layout of the EEPROM map, we must increment this to let the library know to initialise EEPROM
 #define AMOUNT_OF_INDEXES     3                                               // 3 variables will be saved : 1 uint8_t and 2 uint32_t (hopefully the library will account for this)
-#define INDEX_disp            0
-#define INDEX_mAh             1
-#define INDEX_mWh             2
+#define INDEX_disp            100
+#define INDEX_mAh             101
+#define INDEX_mWh             102
 #define OPEN                  0
 #define SAVE                  1
 
-/* Pinout Table - STM32F411CE Blackpill V3*/ 
+/* Pinout Table - STM32F411CE Blackpill V2/ 3*/ 
+// I2C - SCL/SCK = PB6
+// I2C - SDA = PB7
 #define button1          PB15
 #define modeButton_LED   PB13
 #define powerButton_LED  PB12
-// #define power_off_detect A0
+#define power_off_detect PB1
 #define longHoldDuration 400
 #define dim_disp_after   1200000                                         // dim display after 1 200 000 ms = 20 min
 
-// BLE HC-05 Software Serial
+// BLE HM-10 / AT-09 Software Serial
 #define bleTX PA9
 #define bleRX  PA10
-
-//SoftwareSerial mySerial(bleTX, bleRX); 
-//HardwareSerial Serial1(bleTX, bleRX);
-
-
+#define bleState PB0   // 1HZ blink is unconnected, on is Connected
+//  OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define OLED_RESET 6                                                          // assigned to some unused pin - hardware reset not used (and not even available)
-//Adafruit_SSD1306 OLED(OLED_RESET);                                             // construct a display object named "OLED"
-Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+                                            
+Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // construct a display object named "OLED"
 
+//  INA219 
 Adafruit_INA219 ina219(0x40);                                                       // construct a power monitor object named "ina219"
 Adafruit_INA219 ina219Batt(0x41);
-
 
 #define ON  '1'
 #define OFF '0'
@@ -59,7 +63,7 @@ Adafruit_INA219 ina219Batt(0x41);
 #define max_allowed_current 3100      // INA219 with .1 Ohm resistore can measure up to 3.2A - to discourage abuse, do not display any values above this
 #define max_allowed_voltage 25100
 
-#define num_of_last_mode 4          // excluding the dark mode, which we don't wish to boot to (we will also not boot to BATT mode either)
+#define num_of_last_mode 5         // excluding the dark mode, which we don't wish to boot to (we will also not boot to BATT mode either)
 #define A            0
 #define V_A_W        1
 #define V_A_W_Ah_Wh  2
@@ -83,7 +87,7 @@ int         t4 = 0;                          // used for DUT value injection clo
 
 
 uint8_t  DUT_mode                    = 0;
-uint8_t  currentDisplayMode          = 0;
+uint8_t  currentDisplayMode          = 1;
 uint8_t  mode_changes_in_last_5s     = 0;
 uint8_t  dimMode                     = 0;
 uint8_t  disp_inverted               = 0;
@@ -811,6 +815,7 @@ void setBrightness(uint8_t brightness)
   // OLED.dim(false);
   //     OLED.ssd1306_command(SSD1306_SETCONTRAST);                   // 0x81
   //   ssd1306_command(0x8F);
+
   OLED.ssd1306_command(SSD1306_SETCONTRAST);
   OLED.ssd1306_command(brightness);
  
@@ -902,7 +907,7 @@ void displayController(uint8_t mode) {
 //                                        OLED << currentAccumulator;
                                         
                                         format_and_print_large_number(mAh , 68, 25);
-//                                        format_and_print_large_number(analogRead(power_off_detect) , 68, 25);
+                                       //format_and_print_large_number(analogRead(power_off_detect) , 68, 25);
 //                                        format_and_print_large_number(analogRead(battery_level) , 68,55);
                                         format_and_print_large_number(mWh , 68, 55);
                                         
@@ -1129,18 +1134,19 @@ void displayController(uint8_t mode) {
 void EEPROM_controller(uint8_t action) {
 
   if (action == SAVE) {
-                      if (EEPROM.read(INDEX_disp) != currentDisplayMode)                                                                         // only consider saving if the value has changed
+    Serial.println("Save ");
+                      if (myEEPROM.read(INDEX_disp) != currentDisplayMode)                                                                         // only consider saving if the value has changed
                             if (currentDisplayMode >= 0 && currentDisplayMode <= SER) {                                                            // only save if the present value makes sense (we also don't want to start of BATT or the BLACK SCREEN)
-                                                                                      EEPROM.update(INDEX_disp, currentDisplayMode);
-                                                                                      turn(13 , ON);
+                                                                                      myEEPROM.update(INDEX_disp, currentDisplayMode);
+                                                                                      turn(PC13 , ON);
                                                                                       }
 
-//                      EEPROM.get (INDEX_mAh, mAs);                                                                                                                                            // use mAs as temporary storage for EEPROM value for mAh
-//                      EEPROM.get (INDEX_mWh, mWs);                                                                                                                                            // use mWs as temporary storage for EEPROM value for mWh
-                      if (mAs != mAh)                                                                                            //  EEPROM.put(INDEX_mAh, mAh);                                // mAh and mWh cannot and will not be conditioned
-                      if (mWs != mWh)                                                                                             // EEPROM.put(INDEX_mWh, mWh);
+                     // EEPROM.get (INDEX_mAh, mAs);                                                                                                                                            // use mAs as temporary storage for EEPROM value for mAh
+                     // EEPROM.get (INDEX_mWh, mWs);                                                                                                                                            // use mWs as temporary storage for EEPROM value for mWh
+                      if (mAs != mAh)                                                                                            myEEPROM.write(INDEX_mAh, mAh);                                // mAh and mWh cannot and will not be conditioned
+                      if (mWs != mWh)                                                                                            myEEPROM.write(INDEX_mWh, mWh);
                       
-                      if (mAs != mAh)                                                                                              turn(13 , ON);
+                      if (mAs != mAh)                                                                                             // turn(PC13 , ON);
                       
                       mAs = 0;                                                                                                                                                                  // minimise impact of a false power-down detection
                       mWs = 0;
@@ -1148,10 +1154,13 @@ void EEPROM_controller(uint8_t action) {
                       }
 
   if (action == OPEN) {
-                      currentDisplayMode = EEPROM.read(INDEX_disp);                             // EEPROM.read retrieves 1 Byte
+                      Serial.print("bef ");
+                      Serial.print(currentDisplayMode);
+                      currentDisplayMode = myEEPROM.read(INDEX_disp);                             // EEPROM.read retrieves 1 Byte
                     //  EEPROM.get (INDEX_mAh, mAh);                                              // EEPROM.get  retriebes the number of bytes required for the specific variable to be filled in
-                     // EEPROM.get (INDEX_mWh, mWh);
-                      
+                    //  EEPROM.get (INDEX_mWh, mWh);
+                      Serial.println("OPEN ");
+                      Serial.println(myEEPROM.read(INDEX_disp));
                       if (currentDisplayMode > SER) currentDisplayMode = 2;                       // condition currentDisplayMode to make sure that any corrupted data read from the EEPROM won't brick the power monitor
                       
                       return;
@@ -1165,36 +1174,35 @@ void EEPROM_controller(uint8_t action) {
  * 
  * Called every 10 ms to analyse wether power still present  --- not used for now, may add back if writing to SD card or something
  */
-// void powerLoss_detector() {
-//   Serial.println("loss...");
-//   if ( analogRead(power_off_detect) > 950 ) {
-//                                             // Turn off all the lights - conserve as much power for saving to EEPROM as possible
-//                                             turn(powerButton_LED , OFF);
-//                                             turn(modeButton_LED  , OFF);
+void powerLoss_detector() {
 
-//                                             // Save to EEPROM
-//                                             EEPROM_controller(SAVE);
+  if(analogRead(power_off_detect) <  4000 ){
+    pinMode(power_off_detect, OUTPUT);
+    analogWrite(power_off_detect, 4095);
+      Serial.println("Charging...");
+      Serial.println(analogRead(power_off_detect));
 
-//                                             // Turn off display; not worth doing before actually saving, since this takes A LOT of time. Just makes sure the display goes out in an orderly fashion with no garbage on it.
-//                                             // Also, turning on interrupts inside an ISR I'm quite sure is very illegal, please no one tell my mom
-//                                             interrupts();
-//                                             OLED.clearDisplay();
-//                                             OLED.display();
+  }
+  if ( analogRead(power_off_detect) > 600 ) {
+                                            // Turn off all the lights - conserve as much power for saving to EEPROM as possible
+                                            turn(powerButton_LED , OFF);
+                                            turn(modeButton_LED  , OFF);
+                                            Serial.println("save...");
+                                            // Save to EEPROM
+                                            //EEPROM_controller(SAVE);
+
+                                            // Turn off display; not worth doing before actually saving, since this takes A LOT of time. Just makes sure the display goes out in an orderly fashion with no garbage on it.
+                                            // Also, turning on interrupts inside an ISR I'm quite sure is very illegal, please no one tell my mom
+                                            interrupts();
+                                            OLED.clearDisplay();
+                                            OLED.display();
                                             
-//                                             }
+                                            }else{
+                                             // Serial.println("no save...");
+                                            }
                                             
-// }
+}
 
-/*********Serial Print *********/
-
-// uint32_t MyData = 1; // Parameter used for callback is arbitrarily a pointer to uint32_t, it could be of other type.
-
-// // Every second, print on serial MyData. And increment it.
-// void Update_IT_callback(uint32_t* data)
-// {
-//   Serial2.println(*data);
-//   *data = *data + 1;
-// }
 void sendCommand(const char * command) {
   Serial.print("Command send :");
   Serial.println(command);
@@ -1219,7 +1227,6 @@ void setup() {
 
   Serial.begin(9600UL);
   Serial1.begin(9600UL);
-//Serial1.begin(9600);
 
   sendCommand("AT");
   sendCommand("AT+ROLE0");
@@ -1227,19 +1234,19 @@ void setup() {
   sendCommand("AT+CHAR0xFFE1");
   sendCommand("AT+NAMEPower-Monitor");
 
-
-
-
-
-
-
- Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
- Serial1 << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
+  Serial << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
+  Serial1 << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
   pinMode(modeButton_LED , OUTPUT);
   pinMode(powerButton_LED, OUTPUT);
+  pinMode(PC13, OUTPUT);
+  pinMode(power_off_detect, INPUT);
 
-  // pinMode(power_off_detect, INPUT);
-
+  /****************** Initialize EEPROM *******************/
+  
+    byte i2cStat = myEEPROM.begin(myEEPROM.twiClock100kHz);
+  if ( i2cStat != 0 ) {
+    SerialUSB.println(F("I2C Problem"));
+  }
 
   /****************** Attach Interrupt Pins *******************/
   pinMode(button1, INPUT_PULLUP);
@@ -1256,17 +1263,16 @@ void setup() {
   /************************************************************/
 
   /***************** Attach Timer2 Interrupt ******************/
-/////////////////////////  ben  uncomment this for power loss detection
-  // TIM_TypeDef *Instance2 = TIM2;
-  // HardwareTimer *MyTim2 = new HardwareTimer(Instance2); 
-  // MyTim2->setOverflow(100, HERTZ_FORMAT); // 10 Hz
-  // MyTim2->attachInterrupt( powerLoss_detector); // mAh_mWh_computer will be called every 1 second
-  // MyTim2->resume();
+  TIM_TypeDef *Instance2 = TIM2;
+  HardwareTimer *MyTim2 = new HardwareTimer(Instance2); 
+  MyTim2->setOverflow(100, HERTZ_FORMAT); // 10 Hz
+  MyTim2->attachInterrupt( powerLoss_detector); // 
+  MyTim2->resume();
   /************************************************************/
 
 
   /******************** Initialise Display ********************/
-  OLED.begin(SSD1306_SWITCHCAPVCC , 0x3C);                                              // initialise Display and set address to 3C
+ OLED.begin(SSD1306_SWITCHCAPVCC , 0x3C);                                              // initialise Display and set address to 3C   
   OLED.display();
   delay(1000);                                                                         // keep startup logo for 1 second on screen
 
@@ -1282,7 +1288,7 @@ void setup() {
   /************************************************************/
 
   /******************** EEPROM Controller *********************/
-  //EEPROM.begin(EEPROM_LAYOUT_VERSION, AMOUNT_OF_INDEXES);                             // initialise library
+  //EEPROMwl.begin(EEPROM_LAYOUT_VERSION, AMOUNT_OF_INDEXES);                             // initialise library
   
   EEPROM_controller(OPEN);                                                              // read memories from EEPROM
   /************************************************************/
@@ -1296,6 +1302,10 @@ void setup() {
   delay(500);
   /************************************************************/
   system_still_initialising = 0;
+  // turn(PC13 , ON);
+  
+  //   delay(1000);
+     turn(PC13 , ON);
 }
 
 
