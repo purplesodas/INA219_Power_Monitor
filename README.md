@@ -4,9 +4,7 @@ based on https://github.com/lipton5001/INA219_Power_Monitor (https://www.youtube
 
 A few changes from Darie's:  
 Arduinto --> STM32F411 (black pill)  
-USB Serial --> Bluetooth Serial  
+USB Serial --> BLE Bluetooth Serial  
 Analog Pin Battery --> 2nd INA219 for battery & power monitor power usage  
-EEPROM Save State & Wear Leveling --> Not implemented  
-Power Loss Detection --> Not implemented  
-
+EEPROM Save State & Wear Leveling --> External EEPROM, no wear leveling (External EEPROM life is 1,000,000 cycles)
 
