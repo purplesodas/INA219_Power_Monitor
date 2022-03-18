@@ -23,8 +23,8 @@ extEEPROM myEEPROM(kbits_256, 1, 64, 0x50); // Initialize External EEPROM extEEP
 #define EEPROM_LAYOUT_VERSION 0                                               // every time amount of indexes changes, ie we change the layout of the EEPROM map, we must increment this to let the library know to initialise EEPROM
 #define AMOUNT_OF_INDEXES     3                                               // 3 variables will be saved : 1 uint8_t and 2 uint32_t (hopefully the library will account for this)
 #define INDEX_disp            100
-#define INDEX_mAh             101
-#define INDEX_mWh             102
+#define INDEX_mAh             200
+#define INDEX_mWh             300
 #define OPEN                  0
 #define SAVE                  1
 
@@ -42,6 +42,7 @@ extEEPROM myEEPROM(kbits_256, 1, 64, 0x50); // Initialize External EEPROM extEEP
 #define bleTX PA9
 #define bleRX  PA10
 #define bleState PB0   // 1HZ blink is unconnected, on is Connected
+bool bleHeader = false;
 //  OLED
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -1106,6 +1107,13 @@ void displayController(uint8_t mode) {
 // Send data to BLE Serial if BLE Connected, bleState reads > 600.  Reads 1 to 4 when disconnected, ~900 when connected
 if (analogRead(bleState) > 600)
 {
+  if (!bleHeader)  // Print header to BLE just once
+  {
+
+    Serial1 << F("\n") << F("Current") << F(",,,") << F("Voltage") << F(",,,") << F("Power") << F(",,,") << F("mAh") << F(",,,") << F("mWh") << F("\n");
+    bleHeader= true;
+  }
+  
   if ( abs((int)millis() - t2) > 1000 ) {                                                                                    // only print every 1 second
       Serial1 << divideBy1000   (filteredCurrent    , negativeCurrent , 6, current) << F(" , "); 
       Serial1 << divideBy1000   (filteredBusVoltage , 0               , 6, voltage) << F(" , ");
@@ -1153,7 +1161,7 @@ void EEPROM_controller(uint8_t action) {
                       if (myEEPROM.read(INDEX_disp) != currentDisplayMode)                                                                         // only consider saving if the value has changed
                             if (currentDisplayMode >= 0 && currentDisplayMode <= SER) {                                                            // only save if the present value makes sense (we also don't want to start of BATT or the BLACK SCREEN)
                                                                                       myEEPROM.update(INDEX_disp, currentDisplayMode);
-                                                                                      turn(PC13 , OFF);
+                                                                                      turn(PC13 , OFF);  // built in led is opposite, active low
                                                                                       }
 
                      // EEPROM.get (INDEX_mAh, mAs);                                                                                                                                            // use mAs as temporary storage for EEPROM value for mAh
@@ -1161,7 +1169,7 @@ void EEPROM_controller(uint8_t action) {
                       if (mAs != mAh)                                                                                            myEEPROM.write(INDEX_mAh, mAh);                                // mAh and mWh cannot and will not be conditioned
                       if (mWs != mWh)                                                                                            myEEPROM.write(INDEX_mWh, mWh);
                       
-                      if (mAs != mAh)                                                                                             // turn(PC13 , ON);
+                      if (mAs != mAh)                                                                                             turn(PC13 , OFF);
                       
                       mAs = 0;                                                                                                                                                                  // minimise impact of a false power-down detection
                       mWs = 0;
@@ -1193,8 +1201,8 @@ void powerLoss_detector() {
   if(analogRead(power_off_detect) <  800 ){
     pinMode(power_off_detect, OUTPUT);
     digitalWrite(power_off_detect, HIGH);  // For some reason Analog write didn't charge the cap beyond 500, on the scope it was only charging for an instant...
-      Serial.println("Charging...");
-      Serial.println(analogRead(power_off_detect));
+      //Serial.println("Charging...");
+      //Serial.println(analogRead(power_off_detect));
 
   }
   if ( analogRead(power_off_detect) > 1000 ) {
@@ -1316,10 +1324,9 @@ void setup() {
   delay(500);
   /************************************************************/
   system_still_initialising = 0;
-  // turn(PC13 , ON);
-  
-  //   delay(1000);
-     turn(PC13 , ON);
+  // turn(PC13, OFF); // on board LED is opposite, active low
+  // delay(1000);
+   turn(PC13, ON);
 }
 
 
