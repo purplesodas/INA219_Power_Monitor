@@ -1043,13 +1043,13 @@ void displayController(uint8_t mode) {
                                         //OLED << filteredBusBattVoltage << "V";
                                         }break;
                 case SER :              {
+                  // We send serial data to USB Serial if on Serial screen & send to BLE Serial if BLE Connected even if not on serial screen (See Below Switch Case)
                                         if ( abs((int)millis() - t2) > 1000 ) {                                                                                    // only print every 1 second
                                                                          Serial << divideBy1000   (filteredCurrent    , negativeCurrent , 6, current) << F(" , "); 
                                                                          Serial << divideBy1000   (filteredBusVoltage , 0               , 6, voltage) << F(" , ");
                                                                          Serial << divideBy1000000(filteredPower      , 0               , 6)          << F(" , ");
                                                                          Serial << mAh                                                    << F(" , ");
                                                                          Serial << mWh;
-                                                                         Serial << rawBusVoltage;
                                                                          Serial << F("\n");
 
                                                                          t2 = millis();
@@ -1094,7 +1094,7 @@ void displayController(uint8_t mode) {
 
                 case ScreenOFF :              {
                                         turn(modeButton_LED  , OFF);
-                                        //OLED.display();
+                                        OLED.display();
                                         OLED.clearDisplay();
                                         
                                         return;                     // we want the Mode Button LED off, ALWAYS, so we prevent auto-dimmer function below from firing
@@ -1102,6 +1102,21 @@ void displayController(uint8_t mode) {
                 }
 
   OLED.display();
+
+// Send data to BLE Serial if BLE Connected, bleState reads > 600.  Reads 1 to 4 when disconnected, ~900 when connected
+if (analogRead(bleState) > 600)
+{
+  if ( abs((int)millis() - t2) > 1000 ) {                                                                                    // only print every 1 second
+      Serial1 << divideBy1000   (filteredCurrent    , negativeCurrent , 6, current) << F(" , "); 
+      Serial1 << divideBy1000   (filteredBusVoltage , 0               , 6, voltage) << F(" , ");
+      Serial1 << divideBy1000000(filteredPower      , 0               , 6)          << F(" , ");
+      Serial1 << mAh                                                    << F(" , ");
+      Serial1 << mWh;
+      Serial1 << F("\n");
+
+      t2 = millis();
+      }
+}
 
 
 
@@ -1138,7 +1153,7 @@ void EEPROM_controller(uint8_t action) {
                       if (myEEPROM.read(INDEX_disp) != currentDisplayMode)                                                                         // only consider saving if the value has changed
                             if (currentDisplayMode >= 0 && currentDisplayMode <= SER) {                                                            // only save if the present value makes sense (we also don't want to start of BATT or the BLACK SCREEN)
                                                                                       myEEPROM.update(INDEX_disp, currentDisplayMode);
-                                                                                      turn(PC13 , ON);
+                                                                                      turn(PC13 , OFF);
                                                                                       }
 
                      // EEPROM.get (INDEX_mAh, mAs);                                                                                                                                            // use mAs as temporary storage for EEPROM value for mAh
@@ -1175,21 +1190,20 @@ void EEPROM_controller(uint8_t action) {
  * Called every 10 ms to analyse wether power still present  --- not used for now, may add back if writing to SD card or something
  */
 void powerLoss_detector() {
-
-  if(analogRead(power_off_detect) <  4000 ){
+  if(analogRead(power_off_detect) <  800 ){
     pinMode(power_off_detect, OUTPUT);
-    analogWrite(power_off_detect, 4095);
+    digitalWrite(power_off_detect, HIGH);  // For some reason Analog write didn't charge the cap beyond 500, on the scope it was only charging for an instant...
       Serial.println("Charging...");
       Serial.println(analogRead(power_off_detect));
 
   }
-  if ( analogRead(power_off_detect) > 600 ) {
+  if ( analogRead(power_off_detect) > 1000 ) {
                                             // Turn off all the lights - conserve as much power for saving to EEPROM as possible
                                             turn(powerButton_LED , OFF);
                                             turn(modeButton_LED  , OFF);
-                                            Serial.println("save...");
+                                            //Serial.println("save...");
                                             // Save to EEPROM
-                                            //EEPROM_controller(SAVE);
+                                            EEPROM_controller(SAVE);
 
                                             // Turn off display; not worth doing before actually saving, since this takes A LOT of time. Just makes sure the display goes out in an orderly fashion with no garbage on it.
                                             // Also, turning on interrupts inside an ISR I'm quite sure is very illegal, please no one tell my mom
