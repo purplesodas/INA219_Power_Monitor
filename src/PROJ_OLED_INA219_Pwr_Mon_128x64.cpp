@@ -31,8 +31,8 @@ extEEPROM myEEPROM(kbits_256, 1, 64, 0x50); // Initialize External EEPROM extEEP
 /* Pinout Table - STM32F411CE Blackpill V2/ 3*/ 
 // I2C - SCL/SCK = PB6
 // I2C - SDA = PB7
-#define button1          PB15
-#define modeButton_LED   PB13
+#define button1          PB13
+#define modeButton_LED   PB15
 #define powerButton_LED  PB12
 #define power_off_detect PB1
 #define longHoldDuration 400
@@ -51,8 +51,14 @@ bool bleHeader = false;
 Adafruit_SSD1306 OLED(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);  // construct a display object named "OLED"
 
 //  INA219 
+/*  Addresses
+Default: 0x40
+A0 soldered: 0x41
+A1 soldered: 0x44
+A0 & A1 Soldered: 0x45
+*/
 Adafruit_INA219 ina219(0x40);                                                       // construct a power monitor object named "ina219"
-Adafruit_INA219 ina219Batt(0x41);
+Adafruit_INA219 ina219Batt(0x44);
 
 #define ON  '1'
 #define OFF '0'
